@@ -25,14 +25,14 @@
 
 ## 급식 정보 조회 앱
 
-NEIS 오픈 API(`src/openapi.json`)를 활용한 학교 중식(점심) 식단 조회 웹 앱입니다.
+NEIS 오픈 API(`workshop/week-03/src/openapi.json`)를 활용한 학교 중식(점심) 식단 조회 웹 앱입니다.
 
-- **Backend** (`src/api`) — FastAPI + `uv`. NEIS 프록시. 자세한 내용은 [`src/api/README.md`](./src/api/README.md).
-- **Frontend** (`src/web`) — React + Vite + TypeScript + Tailwind v4 + shadcn 스타일 컴포넌트. 자세한 내용은 [`src/web/README.md`](./src/web/README.md).
+- **Backend** (`workshop/week-03/src/api`) — FastAPI + `uv`. NEIS 프록시. 자세한 내용은 [`workshop/week-03/src/api/README.md`](./workshop/week-03/src/api/README.md).
+- **Frontend** (`workshop/week-03/src/web`) — React + Vite + TypeScript + Tailwind v4 + shadcn 스타일 컴포넌트. 자세한 내용은 [`workshop/week-03/src/web/README.md`](./workshop/week-03/src/web/README.md).
 
 ### 사전 준비
 
-`src/.env` 파일에 NEIS 인증키를 설정합니다.
+`workshop/week-03/src/.env` 파일에 NEIS 인증키를 설정합니다.
 
 ```env
 NEIS_API_KEY=발급받은_인증키
@@ -44,14 +44,14 @@ NEIS_API_KEY=발급받은_인증키
 
 ```bash
 # 백엔드 (포트 8000)
-cd src/api
+cd workshop/week-03/src/api
 uv sync
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
 ```bash
 # 프론트엔드 (포트 5173)
-cd src/web
+cd workshop/week-03/src/web
 npm install
 npm run dev
 ```

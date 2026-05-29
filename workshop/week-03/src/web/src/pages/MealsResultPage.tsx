@@ -67,14 +67,12 @@ export default function MealsResultPage() {
 
   const days = useMemo(() => {
     if (!from || !to) return [];
-    try {
-      return eachDayOfInterval({
-        start: parseISO(from),
-        end: parseISO(to),
-      });
-    } catch {
-      return [];
-    }
+    const start = parseISO(from);
+    const end = parseISO(to);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
+    const maxSpanMs = 30 * 24 * 60 * 60 * 1000;
+    if (end < start || end.getTime() - start.getTime() > maxSpanMs) return [];
+    return eachDayOfInterval({ start, end });
   }, [from, to]);
 
   return (

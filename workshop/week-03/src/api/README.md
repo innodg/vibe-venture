@@ -20,7 +20,7 @@ frontend in `../web`. Always filters meals to 중식 (lunch, `MMEAL_SC_CODE=2`).
 ## Run
 
 ```bash
-cd src/api
+cd workshop/week-03/src/api
 uv sync
 uv run uvicorn app.main:app --reload --port 8000
 ```

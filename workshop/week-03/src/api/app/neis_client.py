@@ -65,9 +65,14 @@ class NeisClient:
             "pSize": 1000,
             **{k: v for k, v in params.items() if v is not None and v != ""},
         }
-        response = await self._client.get(path, params=query)
-        response.raise_for_status()
-        payload = response.json()
+        try:
+            response = await self._client.get(path, params=query)
+            response.raise_for_status()
+            payload = response.json()
+        except httpx.HTTPError as exc:
+            raise NeisError("HTTP-ERROR", str(exc)) from exc
+        except ValueError as exc:
+            raise NeisError("INVALID-JSON", "Invalid JSON response from NEIS") from exc
         rows, code, message = _extract_result(payload, list_key)
         if code in _OK_CODES:
             return rows

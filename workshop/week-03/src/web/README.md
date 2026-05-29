@@ -7,7 +7,7 @@ Vite dev proxy (`/api` → `http://localhost:8000`).
 ## Run
 
 ```bash
-cd src/web
+cd workshop/week-03/src/web
 npm install
 npm run dev
 ```
