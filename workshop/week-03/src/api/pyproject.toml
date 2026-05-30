@@ -11,3 +11,20 @@ dependencies = [
     "python-dotenv>=1.0",
     "uvicorn[standard]>=0.32",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0",
+    "pytest-asyncio>=1.0",
+    "pytest-cov>=7.0",
+    "respx>=0.21",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "unit: pure unit tests with no I/O",
+    "integration: tests that exercise the FastAPI app end-to-end with mocked NEIS",
+]

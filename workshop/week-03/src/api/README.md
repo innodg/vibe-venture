@@ -26,3 +26,33 @@ uv run uvicorn app.main:app --reload --port 8000
 ```
 
 OpenAPI docs: <http://localhost:8000/docs>
+
+## Tests
+
+Tests live in `tests/` and are split between **unit** (pure functions, no I/O)
+and **integration** (FastAPI app via `TestClient` with NEIS HTTP boundary mocked
+by `respx`). No test ever hits the real NEIS service.
+
+```text
+tests/
+├── conftest.py              # fixtures: settings override, TestClient, respx mock, factories
+├── unit/
+│   ├── test_neis_client.py
+│   ├── test_schemas.py
+│   └── test_routers_meals_helpers.py
+└── integration/
+    ├── test_health.py
+    ├── test_schools.py
+    └── test_meals.py
+```
+
+Run:
+
+```bash
+uv sync --all-groups            # installs dev deps
+uv run pytest                   # all tests
+uv run pytest -m unit           # unit only
+uv run pytest -m integration    # integration only
+uv run pytest --cov=app         # with coverage
+```
+
