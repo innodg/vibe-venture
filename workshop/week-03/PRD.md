@@ -1,6 +1,6 @@
 # PRD — 급식 정보 조회 웹 앱
 
-> Workshop Week 03 결과물. NEIS 오픈 API(`src/openapi.json`)를 활용해 학교 중식(점심) 식단을 조회하는 단순한 웹 애플리케이션의 제품 요구사항 문서.
+> Workshop Week 03 결과물. [NEIS 오픈 API(`src/openapi.json`)](./src/openapi.json)를 활용해 학교 중식(점심) 식단을 조회하는 단순한 웹 애플리케이션의 제품 요구사항 문서.
 
 ---
 
