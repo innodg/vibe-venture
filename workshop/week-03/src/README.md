@@ -20,11 +20,12 @@ For deeper details on each app, see its own `README.md`. This document is the
 
 | Tool | Version | Used by |
 | --- | --- | --- |
-| Python | 3.12+ | `api` |
-| [`uv`](https://docs.astral.sh/uv/) | latest | `api` |
-| Node.js | 20+ | `web`, `e2e` |
+| Python | 3.12+ | `api` (native dev) |
+| [`uv`](https://docs.astral.sh/uv/) | latest | `api` (native dev) |
+| Node.js | 22+ (24 LTS recommended) | `web`, `e2e` (native dev) |
 | npm | 10+ | `web`, `e2e` |
-| A NEIS API key | — | `api` (real data) |
+| Docker | 24+ with Compose plugin | container/compose flow (optional) |
+| A NEIS API key | — | `api` runtime (real data) |
 
 The NEIS key goes in `workshop/week-03/.env` as `NEIS_API_KEY=...`. The test
 suites do **not** need it — they mock NEIS / `/api/*` at the appropriate
@@ -32,9 +33,15 @@ boundary.
 
 ## 2. Run the apps locally
 
+You have two options: run the apps directly with `uv` and `npm` (best for
+fast inner-loop dev), or run the production-style containers with Docker
+Compose (best for a smoke test of what actually ships).
+
+### 2.1 Native (uv + npm)
+
 You'll want two terminals: one for the API and one for the web app.
 
-### Backend (terminal 1)
+#### Backend (terminal 1)
 
 ```bash
 cd workshop/week-03/src/api
@@ -45,7 +52,7 @@ uv run uvicorn app.main:app --reload --port 8000
 - App: <http://localhost:8000>
 - OpenAPI docs: <http://localhost:8000/docs>
 
-### Frontend (terminal 2)
+#### Frontend (terminal 2)
 
 ```bash
 cd workshop/week-03/src/web
@@ -55,13 +62,52 @@ npm run dev
 
 - App: <http://localhost:5173> (Vite dev server, with `/api` proxied to `:8000`)
 
-### Production-style frontend build
+#### Production-style frontend build
 
 ```bash
 cd workshop/week-03/src/web
 npm run build
 npm run preview          # serves the built bundle at http://localhost:4173
 ```
+
+### 2.2 Docker Compose (production-style, both apps together)
+
+`workshop/week-03/src/compose.yaml` builds and orchestrates the two
+hardened images (FastAPI + uv on the backend, Vite build served by
+unprivileged nginx on the frontend). The web container is the only
+public entrypoint and reverse-proxies `/api/*` to the backend over a
+private network.
+
+Prerequisites: Docker 24+ with the Compose plugin (`docker compose ...`).
+
+```bash
+cd workshop/week-03/src
+cp .env.example .env             # then edit and set NEIS_API_KEY
+docker compose up -d --build     # build images + start both services
+```
+
+- App: <http://localhost:8080> (set `WEB_PORT` in `.env` to use a different host port)
+- API (proxied through web): <http://localhost:8080/api/health>
+- The `api` service is **not** published on the host — it's only reachable from inside the compose network as `http://api:8000`.
+
+Useful commands:
+
+```bash
+docker compose ps                # see service health
+docker compose logs -f web api   # tail logs
+docker compose down              # stop and remove containers
+docker compose down -v           # also drop the network
+```
+
+Hardening that ships in `compose.yaml`:
+
+- Both services run as non-root with `cap_drop: ALL`,
+  `no-new-privileges`, and a read-only root filesystem; writable paths
+  (`/tmp`, nginx's runtime dirs, the envsubst output dir) are explicit
+  tmpfs mounts only.
+- The `web` service waits for `api` to report `healthy` before starting.
+- `NEIS_API_KEY` is required — Compose fails fast with a clear error if
+  it's not set.
 
 ## 3. Test the apps
 
@@ -138,11 +184,14 @@ Expected: **40 + 17 + 3 = 60 tests passing**.
 ```
 workshop/week-03/src/
 ├── README.md            ← you are here
+├── compose.yaml         Docker Compose: orchestrates api + web
+├── .env.example         Template for compose env (NEIS_API_KEY, WEB_PORT)
 ├── api/
 │   ├── app/             FastAPI app (routers, NEIS client, schemas, settings)
 │   ├── tests/
 │   │   ├── unit/
 │   │   └── integration/
+│   ├── Dockerfile       Hardened multi-stage image (uv builder + slim runtime)
 │   ├── pyproject.toml
 │   └── README.md
 ├── web/
@@ -151,6 +200,8 @@ workshop/week-03/src/
 │   │   ├── components/  UI components (shadcn-flavored)
 │   │   ├── lib/         api client + utils (with colocated unit tests)
 │   │   └── test/        MSW handlers, integration suites, test utilities
+│   ├── nginx/           Hardened nginx.conf + default.conf.template
+│   ├── Dockerfile       Multi-stage Node builder + nginx-unprivileged runtime
 │   ├── package.json
 │   └── README.md
 └── e2e/
@@ -164,9 +215,10 @@ workshop/week-03/src/
 
 ## 5. Troubleshooting
 
-- **Port already in use** — `8000` (api), `5173` (web dev), `4173` (web preview / e2e).
-  Change with `--port` or stop the previous process.
+- **Port already in use** — `8000` (api), `5173` (web dev), `4173` (web preview / e2e),
+  `8080` (compose web). Change with `--port`, set `WEB_PORT=...` in `.env` for compose, or stop the previous process.
 - **E2E `webServer` timeout** — Playwright probes `127.0.0.1:4173`. The
   config explicitly binds Vite preview to `127.0.0.1` to match. If you change
   the host, update both ends.
 - **NEIS key missing in dev** — only the `api` runtime needs it. Tests don't.
+- **Compose: `NEIS_API_KEY is required`** — copy `.env.example` to `.env` and set the key, or export it in your shell before `docker compose up`.
