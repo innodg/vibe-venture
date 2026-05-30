@@ -1,0 +1,25 @@
+node_modules
+dist
+coverage
+playwright-report
+test-results
+
+.git
+.gitignore
+.dockerignore
+Dockerfile
+README.md
+
+# Local env / secrets
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.vscode
+.idea
+.DS_Store
+
+# Vitest / TS caches
+.vitest
+*.tsbuildinfo

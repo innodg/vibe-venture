@@ -1,0 +1,32 @@
+# Keep the build context small and free of secrets / dev artefacts.
+.git
+.gitignore
+.dockerignore
+Dockerfile
+README.md
+
+# Python
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+coverage.xml
+
+# Tests are not needed in the runtime image
+tests
+
+# Local secrets / env
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.vscode
+.idea
+.DS_Store

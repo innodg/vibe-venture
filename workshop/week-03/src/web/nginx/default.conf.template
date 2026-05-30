@@ -1,0 +1,85 @@
+# Server block produced from this template at container startup
+# (see the entrypoint of nginxinc/nginx-unprivileged, which runs
+# envsubst over every *.template in /etc/nginx/templates).
+#
+# Only ${API_UPSTREAM} is substituted; everything else is literal.
+
+# Resolve upstream at startup; fail fast if it's missing.
+# (No upstream{} block needed; we point proxy_pass at ${API_UPSTREAM} directly.)
+
+server {
+    listen       8080;
+    server_name  _;
+
+    # Where the built SPA lives.
+    root   /usr/share/nginx/html;
+    index  index.html;
+
+    # ---- Body limits -------------------------------------------------------
+    # The frontend never POSTs anything large; cap requests defensively.
+    client_max_body_size 1m;
+
+    # ---- Security headers --------------------------------------------------
+    # NOTE: nginx `add_header` directives are NOT inherited by a `location`
+    # block as soon as that location declares any `add_header` of its own.
+    # To avoid silently dropping CSP/Permissions-Policy from cached or SPA
+    # responses, we apply the full set inside each location below via the
+    # shared snippet at /etc/nginx/snippets/security-headers.conf (inlined
+    # here using `include`-equivalent literal blocks).
+
+    # ---- API proxy ---------------------------------------------------------
+    # All /api/* requests are forwarded to the FastAPI container. The
+    # variable form forces nginx to re-resolve the hostname via the
+    # platform DNS (important on Container Apps / Kubernetes where the
+    # api may be redeployed and get a new IP).
+    location /api/ {
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_read_timeout 30s;
+        proxy_connect_timeout 5s;
+
+        # API_UPSTREAM is replaced at container startup by envsubst.
+        proxy_pass ${API_UPSTREAM};
+
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    }
+
+    # ---- Static assets -----------------------------------------------------
+    # Vite emits hashed filenames under /assets, so they are safe to cache
+    # for a long time.
+    location /assets/ {
+        try_files $uri =404;
+        expires 1y;
+        add_header Cache-Control "public, immutable" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+    }
+
+    # ---- SPA fallback ------------------------------------------------------
+    location / {
+        try_files $uri $uri/ /index.html;
+        # index.html itself must never be cached — that's how clients
+        # discover new bundle hashes.
+        add_header Cache-Control "no-store" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options "DENY" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()" always;
+        add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" always;
+    }
+
+    # Block dotfiles (e.g. accidentally shipped .env) explicitly.
+    location ~ /\.(?!well-known) {
+        deny all;
+        return 404;
+    }
+}
