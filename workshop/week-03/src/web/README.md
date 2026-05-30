@@ -31,10 +31,7 @@ app live under `src/test/integration/`.
 ```text
 src/
 ├── lib/
-│   ├── api.ts          api.test.ts        # unit
-│   └── utils.ts        utils.test.ts      # unit
-├── components/ui/
-│   └── button.tsx      button.test.tsx    # unit
+│   └── api.ts          api.test.ts        # unit (URL/error logic)
 └── test/
     ├── setup.ts                            # jest-dom + MSW lifecycle
     ├── test-utils.tsx                      # renderWithProviders helper
@@ -45,6 +42,12 @@ src/
         ├── search-flow.test.tsx
         └── meals-flow.test.tsx
 ```
+
+> Note: presentational components (e.g. `Button`) and one-line utilities
+> (`cn`) deliberately do **not** have unit tests — they have no branching
+> logic of their own and are already exercised by the integration suite.
+> Add component-level unit tests only when a component owns real logic
+> (state machines, form validation, complex keyboard handlers).
 
 `MSW` intercepts all `/api/*` requests so tests are deterministic and offline.
 
