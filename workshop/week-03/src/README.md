@@ -4,9 +4,14 @@ Full-stack 급식 (school lunch) lookup app for the week-03 workshop.
 
 ```
 src/
-├── api/    FastAPI backend (Python 3.12+ / uv)
-├── web/    React + Vite + TypeScript frontend
-└── e2e/    Playwright end-to-end tests
+├── api/         FastAPI backend (Python 3.12+ / uv)
+├── web/         React + Vite + TypeScript frontend (served by nginx in prod)
+├── e2e/         Playwright end-to-end tests
+├── infra/       Bicep used by `azd up` (Container Apps + ACR + LAW + App Insights)
+├── azure.yaml   azd service map (api + web → Azure Container Apps)
+├── compose.yaml Docker Compose: orchestrates the two containerised apps
+├── .env.example Template env file (NEIS_API_KEY, optional WEB_PORT)
+└── openapi.json NEIS Open API spec the backend was built against
 ```
 
 The frontend talks to the backend via `/api/*`. In `npm run dev` mode that's
@@ -27,9 +32,10 @@ For deeper details on each app, see its own `README.md`. This document is the
 | Docker | 24+ with Compose plugin | container/compose flow (optional) |
 | A NEIS API key | — | `api` runtime (real data) |
 
-The NEIS key goes in `workshop/week-03/.env` as `NEIS_API_KEY=...`. The test
-suites do **not** need it — they mock NEIS / `/api/*` at the appropriate
-boundary.
+For native dev, the NEIS key goes in `workshop/week-03/src/.env` as
+`NEIS_API_KEY=...` (the api auto-loads it via pydantic-settings, and Docker
+Compose / azd read the same variable). The test suites do **not** need it —
+they mock NEIS / `/api/*` at the appropriate boundary.
 
 ## 2. Run the apps locally
 
@@ -246,32 +252,48 @@ workshop/week-03/src/
 ├── README.md            ← you are here
 ├── azure.yaml           azd service map (api + web → containerapp)
 ├── compose.yaml         Docker Compose: orchestrates api + web
-├── .env.example         Template for compose env (NEIS_API_KEY, WEB_PORT)
-├── infra/               Bicep used by `azd up` (Container Apps + ACR + LAW)
-│   ├── main.bicep
-│   ├── main.parameters.json
-│   └── resources.bicep
+├── .env.example         Template env (NEIS_API_KEY, WEB_PORT)
+├── openapi.json         NEIS Open API spec used to build the backend
+├── infra/               Bicep used by `azd up`
+│   ├── main.bicep            subscription scope: RG + module call
+│   ├── main.parameters.json  pulls AZURE_ENV_NAME / NEIS_API_KEY etc. from azd env
+│   └── resources.bicep       RG scope: LAW, App Insights, UAMI, ACR, ACA env, api+web
 ├── api/
-│   ├── app/             FastAPI app (routers, NEIS client, schemas, settings)
+│   ├── app/             FastAPI app
+│   │   ├── routers/         /api/* route handlers (health, schools, meals)
+│   │   ├── main.py          app factory, CORS, lifespan
+│   │   ├── config.py        pydantic-settings (NEIS_API_KEY, CORS_ORIGINS, ...)
+│   │   ├── neis_client.py   thin httpx client over the NEIS Open API
+│   │   └── schemas.py       request/response models
 │   ├── tests/
 │   │   ├── unit/
-│   │   └── integration/
+│   │   ├── integration/
+│   │   └── conftest.py      shared fixtures (settings override, respx, factories)
 │   ├── Dockerfile       Hardened multi-stage image (uv builder + slim runtime)
+│   ├── .dockerignore
 │   ├── pyproject.toml
+│   ├── uv.lock
 │   └── README.md
 ├── web/
 │   ├── src/
 │   │   ├── pages/       routed pages (Landing, DateRange, MealsResult)
 │   │   ├── components/  UI components (shadcn-flavored)
 │   │   ├── lib/         api client + utils (with colocated unit tests)
+│   │   ├── assets/      static assets bundled by Vite
 │   │   └── test/        MSW handlers, integration suites, test utilities
-│   ├── nginx/           Hardened nginx.conf + default.conf.template
+│   ├── public/          static files served as-is
+│   ├── nginx/           nginx.conf + default.conf.template (prod runtime)
 │   ├── Dockerfile       Multi-stage Node builder + nginx-unprivileged runtime
+│   ├── .dockerignore
+│   ├── index.html
+│   ├── vite.config.ts
+│   ├── vitest.config.ts
 │   ├── package.json
 │   └── README.md
 └── e2e/
     ├── tests/           happy-path + no-results specs
-    ├── support/         POM helpers + `mockApi` fixture
+    ├── support/
+    │   └── pages/       Playwright Page Object Models
     ├── fixtures/        canned NEIS-shaped payloads
     ├── playwright.config.ts
     ├── package.json
