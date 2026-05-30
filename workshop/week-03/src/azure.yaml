@@ -11,6 +11,7 @@ services:
     docker:
       path: Dockerfile
       context: .
+      remoteBuild: true
 
   web:
     project: ./web
@@ -19,16 +20,28 @@ services:
     docker:
       path: Dockerfile
       context: .
+      remoteBuild: true
 
 hooks:
   preprovision:
-    shell: sh
-    continueOnError: false
-    interactive: true
-    run: |
-      set -e
-      if [ -z "${NEIS_API_KEY:-}" ]; then
-        echo "ERROR: NEIS_API_KEY is not set in the azd environment." >&2
-        echo "Run:  azd env set NEIS_API_KEY <your-key>"             >&2
-        exit 1
-      fi
+    posix:
+      shell: sh
+      continueOnError: false
+      interactive: true
+      run: |
+        set -e
+        if [ -z "${NEIS_API_KEY:-}" ]; then
+          echo "ERROR: NEIS_API_KEY is not set in the azd environment." >&2
+          echo "Run:  azd env set NEIS_API_KEY <your-key>"             >&2
+          exit 1
+        fi
+    windows:
+      shell: pwsh
+      continueOnError: false
+      interactive: true
+      run: |
+        if ([string]::IsNullOrWhiteSpace($env:NEIS_API_KEY)) {
+          Write-Error "NEIS_API_KEY is not set in the azd environment."
+          Write-Host  "Run:  azd env set NEIS_API_KEY <your-key>"
+          exit 1
+        }
