@@ -33,7 +33,11 @@ server {
     # platform DNS (important on Container Apps / Kubernetes where the
     # api may be redeployed and get a new IP).
     location /api/ {
-        proxy_set_header Host              $host;
+        # NOTE on Host header: $proxy_host (the host in proxy_pass URL) is
+        # required when upstream is virtual-hosted — e.g. Azure Container
+        # Apps internal ingress, which routes by Host header. For docker
+        # compose this still works (api container ignores Host).
+        proxy_set_header Host              $proxy_host;
         proxy_set_header X-Real-IP         $remote_addr;
         proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -41,6 +45,10 @@ server {
         proxy_set_header Connection "";
         proxy_read_timeout 30s;
         proxy_connect_timeout 5s;
+
+        # Required for SNI when upstream is HTTPS with an FQDN
+        # (Azure Container Apps internal ingress is HTTPS).
+        proxy_ssl_server_name on;
 
         # API_UPSTREAM is replaced at container startup by envsubst.
         proxy_pass ${API_UPSTREAM};

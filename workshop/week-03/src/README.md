@@ -109,6 +109,66 @@ Hardening that ships in `compose.yaml`:
 - `NEIS_API_KEY` is required — Compose fails fast with a clear error if
   it's not set.
 
+### 2.3 Azure Container Apps via `azd up`
+
+Provisions and deploys both apps to Azure Container Apps using the Bicep
+under `infra/` and the existing Dockerfiles. The frontend (`web`) is the
+only public ingress; the backend (`api`) is internal-only and reachable
+only from `web` via the env's private DNS.
+
+What gets provisioned:
+
+- Resource group (`rg-<env-name>`)
+- Log Analytics + Application Insights
+- User-Assigned Managed Identity (used by both apps to pull from ACR)
+- Azure Container Registry (admin disabled, `AcrPull` granted to the UAMI)
+- Azure Container Apps Environment (Consumption, logs to Log Analytics)
+- `api` Container App — **internal** ingress, port 8000, NEIS_API_KEY as a secret
+- `web` Container App — **external** ingress, port 8080, `API_UPSTREAM` wired to `https://<api-internal-fqdn>`
+
+Prerequisites: [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli), [Azure Developer CLI (`azd`)](https://learn.microsoft.com/azure/developer/azure-developer-cli/install-azd), Docker.
+
+```bash
+cd workshop/week-03/src
+
+# One-time per environment
+azd auth login
+azd env new dev                   # any name; controls the resource group suffix
+azd env set NEIS_API_KEY <key>    # required; stored as a Container App secret
+
+# Provision + build + push + deploy
+azd up
+```
+
+`azd up` will pick a region (or you can set `AZURE_LOCATION`), provision
+infra, build the two Docker images locally, push them to the provisioned
+ACR, and update the Container Apps to use the new images. The web URL is
+printed at the end of the run as `SERVICE_WEB_URI`.
+
+Useful follow-ups:
+
+```bash
+azd deploy            # rebuild + push + redeploy after code changes (no infra)
+azd provision         # bicep-only (no image push)
+azd show              # show endpoints and resource references
+azd monitor --live    # live App Insights logs
+azd down --purge      # delete everything provisioned
+```
+
+Notes:
+
+- The `azd-service-name` tag on each Container App (`api`, `web`) is what
+  azd uses to find which app to update. Keep service names in
+  `azure.yaml` and the Bicep tags in sync.
+- Cross-app wiring is computed deterministically in `infra/resources.bicep`
+  (no circular reference between the two Container Apps): `web` knows
+  `api`'s internal FQDN, and `api`'s `CORS_ORIGINS` is pre-populated with
+  `web`'s public URL.
+- Web → API in production goes nginx → `https://<api>.internal.<env-domain>`
+  (HTTPS, terminated at the env's edge). The nginx config sets
+  `proxy_set_header Host $proxy_host` and `proxy_ssl_server_name on` so
+  the upstream's host-header routing and TLS SNI both work.
+
 ## 3. Test the apps
 
 Three test layers, smallest to largest:
@@ -184,8 +244,13 @@ Expected: **40 + 17 + 3 = 60 tests passing**.
 ```
 workshop/week-03/src/
 ├── README.md            ← you are here
+├── azure.yaml           azd service map (api + web → containerapp)
 ├── compose.yaml         Docker Compose: orchestrates api + web
 ├── .env.example         Template for compose env (NEIS_API_KEY, WEB_PORT)
+├── infra/               Bicep used by `azd up` (Container Apps + ACR + LAW)
+│   ├── main.bicep
+│   ├── main.parameters.json
+│   └── resources.bicep
 ├── api/
 │   ├── app/             FastAPI app (routers, NEIS client, schemas, settings)
 │   ├── tests/
