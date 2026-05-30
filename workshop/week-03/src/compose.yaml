@@ -1,0 +1,82 @@
+name: vibe-venture-week03
+
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    image: vibe-venture/api:latest
+    container_name: vibe-api
+    restart: unless-stopped
+    environment:
+      # Required: provide via shell env or a .env file next to this compose file.
+      NEIS_API_KEY: ${NEIS_API_KEY:?NEIS_API_KEY is required}
+      NEIS_BASE_URL: ${NEIS_BASE_URL:-https://open.neis.go.kr/hub}
+      # Requests reach the API only via the web/nginx reverse proxy,
+      # so same-origin is the only allowed CORS origin in this setup.
+      CORS_ORIGINS: '["http://localhost:8080"]'
+      PORT: "8000"
+    expose:
+      - "8000"
+    networks:
+      - vibe
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys;\
+sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=2).status==200 else 1)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop:
+      - ALL
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    image: vibe-venture/web:latest
+    container_name: vibe-web
+    restart: unless-stopped
+    environment:
+      # nginx envsubst rewrites this into /etc/nginx/conf.d/default.conf at startup.
+      API_UPSTREAM: http://api:8000
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - vibe
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -qO-
+        - http://127.0.0.1:8080/
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /var/cache/nginx:size=32m,uid=101,gid=101
+      - /var/run:size=4m,uid=101,gid=101
+      - /etc/nginx/conf.d:size=4m,uid=101,gid=101
+    cap_drop:
+      - ALL
+
+networks:
+  vibe:
+    driver: bridge
