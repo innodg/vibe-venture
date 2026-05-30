@@ -22,7 +22,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: builder — produce the production bundle
 # -----------------------------------------------------------------------------
-ARG NODE_VERSION=20
+ARG NODE_VERSION=24
 FROM node:${NODE_VERSION}-alpine AS builder
 
 ENV NODE_ENV=production \
