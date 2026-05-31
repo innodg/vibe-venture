@@ -138,7 +138,7 @@ cd workshop/week-03/src
 
 # 환경별 일회성 설정
 azd auth login
-azd env new dev                   # 임의의 이름; 리소스 그룹 접미사를 결정함
+azd env new <random-string>       # 임의의 이름; 리소스 그룹 접미사를 결정함
 azd env set NEIS_API_KEY <key>    # 필수; Container App 시크릿으로 저장됨
 
 # 프로비저닝 + 빌드 + 푸시 + 배포
