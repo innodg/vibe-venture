@@ -34,8 +34,7 @@ WORKDIR /app
 # Cache deps independently of source. Use the lockfile and never resolve
 # ranges at build time.
 COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --include=dev
+RUN npm ci --include=dev
 
 # Copy the rest of the source and build. Tests/coverage are excluded via
 # .dockerignore and tsconfig.app.json's `exclude`, so `tsc -b` stays fast.

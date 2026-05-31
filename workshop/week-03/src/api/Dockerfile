@@ -46,13 +46,11 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 
 # Install runtime deps only (no `--all-groups`), strictly from the lockfile.
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev --no-install-project
+RUN uv sync --frozen --no-dev --no-install-project
 
 # Copy the application source and install the project itself into the venv.
 COPY app ./app
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev
 
 # -----------------------------------------------------------------------------
 # Stage 2: runtime — minimal image, non-root, no build tools
