@@ -1,0 +1,58 @@
+name: Convert showcase issue to discussion
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+  discussions: write
+
+jobs:
+  convert:
+    if: |
+      contains(github.event.issue.labels.*.name, 'showcase') &&
+      (github.event.issue.author_association == 'MEMBER' ||
+       github.event.issue.author_association == 'OWNER')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Look up discussion category ID
+        id: cat
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          CATEGORY_SLUG: '01-내가-만든-앱-자랑하기'
+        run: |
+          id=$(gh api graphql \
+            -F owner="$OWNER" \
+            -F name="$REPO" \
+            -F slug="$CATEGORY_SLUG" \
+            -f query='
+              query($owner: String!, $name: String!, $slug: String!) {
+                repository(owner: $owner, name: $name) {
+                  discussionCategory(slug: $slug) { id }
+                }
+              }' \
+            --jq '.data.repository.discussionCategory.id')
+          if [ -z "$id" ] || [ "$id" = "null" ]; then
+            echo "::error::Discussion category '$CATEGORY_SLUG' not found."
+            exit 1
+          fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
+      - name: Convert issue to discussion
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_ID: ${{ github.event.issue.node_id }}
+          CATEGORY_ID: ${{ steps.cat.outputs.id }}
+        run: |
+          gh api graphql \
+            -f query='
+              mutation($issueId: ID!, $categoryId: ID!) {
+                convertIssueToDiscussion(input: {issueId: $issueId, categoryId: $categoryId}) {
+                  discussion { url }
+                }
+              }' \
+            -f issueId="$ISSUE_ID" \
+            -F categoryId="$CATEGORY_ID"

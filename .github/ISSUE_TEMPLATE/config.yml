@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 질문은 디스커션으로
+    url: https://github.com/innodg/vibe-venture/discussions
+    about: 일반 질문은 디스커션을 이용해 주세요.
