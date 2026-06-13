@@ -10,14 +10,26 @@ permissions:
 
 jobs:
   convert:
-    if: |
-      contains(github.event.issue.labels.*.name, 'showcase') &&
-      (github.event.issue.author_association == 'MEMBER' ||
-       github.event.issue.author_association == 'OWNER')
+    if: contains(github.event.issue.labels.*.name, 'showcase')
     runs-on: ubuntu-latest
     steps:
+      - name: Reject non-member author
+        if: |
+          github.event.issue.author_association != 'MEMBER' &&
+          github.event.issue.author_association != 'OWNER'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+        run: |
+          gh issue comment "$ISSUE_URL" --body "바이브 벤처 프로젝트 참가자가 아닙니다."
+          gh issue close "$ISSUE_URL" --reason "not planned"
+          exit 0
+
       - name: Look up discussion category ID
         id: cat
+        if: |
+          github.event.issue.author_association == 'MEMBER' ||
+          github.event.issue.author_association == 'OWNER'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OWNER: ${{ github.repository_owner }}
@@ -42,6 +54,9 @@ jobs:
           echo "id=$id" >> "$GITHUB_OUTPUT"
 
       - name: Convert issue to discussion
+        if: |
+          github.event.issue.author_association == 'MEMBER' ||
+          github.event.issue.author_association == 'OWNER'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_ID: ${{ github.event.issue.node_id }}
