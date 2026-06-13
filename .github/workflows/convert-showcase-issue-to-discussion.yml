@@ -182,7 +182,7 @@ jobs:
           EOF
           )
 
-          discussion_url=$(gh api graphql \
+          response=$(gh api graphql \
             -F repositoryId="$REPOSITORY_ID" \
             -F categoryId="$CATEGORY_ID" \
             -F title="$ISSUE_TITLE" \
@@ -195,11 +195,14 @@ jobs:
                   title: $title,
                   body: $body
                 }) {
-                  discussion { url }
+                  discussion { id url }
                 }
-              }' \
-            --jq '.data.createDiscussion.discussion.url')
+              }')
 
+          discussion_id=$(echo "$response" | jq -r '.data.createDiscussion.discussion.id')
+          discussion_url=$(echo "$response" | jq -r '.data.createDiscussion.discussion.url')
+
+          echo "discussion_id=$discussion_id" >> "$GITHUB_OUTPUT"
           echo "discussion_url=$discussion_url" >> "$GITHUB_OUTPUT"
 
       - name: Comment and close original issue
@@ -211,3 +214,13 @@ jobs:
         run: |
           gh issue comment "$ISSUE_URL" --body "토론으로 옮겼습니다: $DISCUSSION_URL"
           gh issue close "$ISSUE_URL" --reason completed
+
+      - name: Lock new discussion
+        if: steps.validate.outputs.valid == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISCUSSION_ID: ${{ steps.create_discussion.outputs.discussion_id }}
+        run: |
+          gh api graphql \
+            -f query='mutation($id: ID!) { lockLockable(input: {lockableId: $id}) { lockedRecord { locked } } }' \
+            -f id="$DISCUSSION_ID"
