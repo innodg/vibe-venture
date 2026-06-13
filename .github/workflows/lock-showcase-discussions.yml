@@ -1,0 +1,32 @@
+name: Lock showcase discussions
+
+on:
+  discussion:
+    types: [created]
+
+permissions:
+  discussions: write
+
+jobs:
+  lock:
+    if: github.event.discussion.category.slug == '01-내가-만든-앱-자랑하기'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check author permission
+        id: perm
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTHOR: ${{ github.event.discussion.user.login }}
+        run: |
+          permission=$(gh api "repos/${{ github.repository }}/collaborators/$AUTHOR/permission" --jq '.permission')
+          echo "permission=$permission" >> "$GITHUB_OUTPUT"
+
+      - name: Lock discussion
+        if: steps.perm.outputs.permission != 'admin'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISCUSSION_ID: ${{ github.event.discussion.node_id }}
+        run: |
+          gh api graphql \
+            -f query='mutation($id: ID!) { lockLockable(input: {lockableId: $id}) { lockedRecord { locked } } }' \
+            -f id="$DISCUSSION_ID"
