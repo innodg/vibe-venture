@@ -13,19 +13,33 @@ jobs:
     if: contains(github.event.issue.labels.*.name, 'showcase')
     runs-on: ubuntu-latest
     steps:
-      - name: Check author permission
+      - name: Generate bot token
+        id: bot-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.BOT_CLIENT_ID }}
+          private-key: ${{ secrets.BOT_PRIVATE_KEY }}
+          repositories: |
+            operations
+            preliminary-stages
+
+      - name: Check team membership
         id: perm
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.bot-token.outputs.token }}
           AUTHOR: ${{ github.event.issue.user.login }}
+          ORG: ${{ github.repository_owner }}
         run: |
-          permission=$(gh api "repos/${{ github.repository }}/collaborators/$AUTHOR/permission" --jq '.permission' 2>/dev/null || echo none)
-          echo "permission=$permission" >> "$GITHUB_OUTPUT"
-          if [ "$permission" = "admin" ] || [ "$permission" = "maintain" ] || [ "$permission" = "write" ]; then
-            echo "allowed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "allowed=false" >> "$GITHUB_OUTPUT"
-          fi
+          allowed=false
+          for team in admin operations candidates; do
+            state=$(gh api "orgs/$ORG/teams/$team/memberships/$AUTHOR" --jq '.state' 2>/dev/null || echo "")
+            if [ "$state" = "active" ]; then
+              allowed=true
+              echo "Author '$AUTHOR' is a member of @$ORG/$team."
+              break
+            fi
+          done
+          echo "allowed=$allowed" >> "$GITHUB_OUTPUT"
 
       - name: Reject non-member author
         if: steps.perm.outputs.allowed == 'false'
