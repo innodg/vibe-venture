@@ -13,23 +13,32 @@ jobs:
     if: contains(github.event.issue.labels.*.name, 'showcase')
     runs-on: ubuntu-latest
     steps:
+      - name: Check author permission
+        id: perm
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AUTHOR: ${{ github.event.issue.user.login }}
+        run: |
+          permission=$(gh api "repos/${{ github.repository }}/collaborators/$AUTHOR/permission" --jq '.permission' 2>/dev/null || echo none)
+          echo "permission=$permission" >> "$GITHUB_OUTPUT"
+          if [ "$permission" = "admin" ] || [ "$permission" = "maintain" ] || [ "$permission" = "write" ]; then
+            echo "allowed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "allowed=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Reject non-member author
-        if: |
-          github.event.issue.author_association != 'MEMBER' &&
-          github.event.issue.author_association != 'OWNER'
+        if: steps.perm.outputs.allowed == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_URL: ${{ github.event.issue.html_url }}
         run: |
           gh issue comment "$ISSUE_URL" --body "바이브 벤처 프로젝트 참가자가 아닙니다."
           gh issue close "$ISSUE_URL" --reason "not planned"
-          exit 0
 
       - name: Validate issue body
         id: validate
-        if: |
-          github.event.issue.author_association == 'MEMBER' ||
-          github.event.issue.author_association == 'OWNER'
+        if: steps.perm.outputs.allowed == 'true'
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
