@@ -25,11 +25,95 @@ jobs:
           gh issue close "$ISSUE_URL" --reason "not planned"
           exit 0
 
-      - name: Look up discussion category ID
-        id: cat
+      - name: Validate issue body
+        id: validate
         if: |
           github.event.issue.author_association == 'MEMBER' ||
           github.event.issue.author_association == 'OWNER'
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          python3 <<'PY'
+          import os, re
+          from urllib.parse import urlparse
+
+          body = os.environ.get("ISSUE_BODY", "") or ""
+          sections = re.split(r'(?m)^###\s+', body)
+          fields = {}
+          for section in sections[1:]:
+              head, _, rest = section.partition('\n')
+              fields[head.strip()] = rest.strip()
+
+          def get(prefix):
+              for label, value in fields.items():
+                  if label.startswith(prefix):
+                      return value.strip()
+              return ''
+
+          errors = []
+
+          url = get('애플리케이션 링크')
+          if url and '://' not in url:
+              url = 'https://' + url
+          azure_suffixes = (
+              '.azurewebsites.net',
+              '.azurecontainerapps.io',
+              '.azurestaticapps.net',
+              '.azure-api.net',
+              '.cloudapp.azure.com',
+              '.azurefd.net',
+              '.azureedge.net',
+              '.web.core.windows.net',
+              '.azurecontainer.io',
+              '.trafficmanager.net',
+          )
+          try:
+              host = (urlparse(url).hostname or '').lower()
+          except Exception:
+              host = ''
+          if not host or not host.endswith(azure_suffixes):
+              errors.append('앱 배포 링크는 반드시 Azure 클라우드에 있어야 합니다.')
+
+          school = get('애플리케이션 개발자 학교')
+          school_valid = school.endswith(('초등학교', '중학교', '고등학교'))
+          if not school_valid:
+              errors.append("학교명은 반드시 '초등학교', '중학교' 또는 '고등학교'로 끝나야 합니다.")
+
+          grade_str = get('애플리케이션 개발자 학년')
+          if school_valid:
+              max_grade = 6 if school.endswith('초등학교') else 3
+              if not grade_str.isdigit() or not 1 <= int(grade_str) <= max_grade:
+                  errors.append(f'학년은 반드시 1-{max_grade} 사이의 숫자여야 합니다.')
+
+          class_str = get('애플리케이션 개발자 학반')
+          if not class_str.isdigit() or not 1 <= int(class_str) <= 9:
+              errors.append('학반은 반드시 1-9 사이의 숫자여야 합니다.')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
+              if errors:
+                  f.write('valid=false\n')
+                  f.write('comment<<__EOF__\n')
+                  f.write('다음 항목을 확인해 주세요.\n\n')
+                  for e in errors:
+                      f.write(f'- {e}\n')
+                  f.write('__EOF__\n')
+              else:
+                  f.write('valid=true\n')
+          PY
+
+      - name: Reject invalid submission
+        if: steps.validate.outputs.valid == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          COMMENT: ${{ steps.validate.outputs.comment }}
+        run: |
+          gh issue comment "$ISSUE_URL" --body "$COMMENT"
+          gh issue close "$ISSUE_URL" --reason "not planned"
+
+      - name: Look up discussion category ID
+        id: cat
+        if: steps.validate.outputs.valid == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OWNER: ${{ github.repository_owner }}
@@ -54,9 +138,7 @@ jobs:
           echo "id=$id" >> "$GITHUB_OUTPUT"
 
       - name: Convert issue to discussion
-        if: |
-          github.event.issue.author_association == 'MEMBER' ||
-          github.event.issue.author_association == 'OWNER'
+        if: steps.validate.outputs.valid == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_ID: ${{ github.event.issue.node_id }}
