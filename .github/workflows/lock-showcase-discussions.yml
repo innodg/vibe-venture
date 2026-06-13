@@ -18,7 +18,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AUTHOR: ${{ github.event.discussion.user.login }}
         run: |
-          permission=$(gh api "repos/${{ github.repository }}/collaborators/$AUTHOR/permission" --jq '.permission')
+          permission=$(gh api "repos/${{ github.repository }}/collaborators/$AUTHOR/permission" --jq '.permission' 2>/dev/null || echo none)
           echo "permission=$permission" >> "$GITHUB_OUTPUT"
 
       - name: Lock discussion

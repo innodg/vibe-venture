@@ -22,6 +22,7 @@ jobs:
           repositories: |
             operations
             preliminary-stages
+            vibe-venture
 
       - name: Check team membership
         id: perm
@@ -168,7 +169,7 @@ jobs:
         id: create_discussion
         if: steps.validate.outputs.valid == 'true'
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.bot-token.outputs.token }}
           REPOSITORY_ID: ${{ github.event.repository.node_id }}
           CATEGORY_ID: ${{ steps.cat.outputs.id }}
           ISSUE_TITLE: ${{ github.event.issue.title }}
