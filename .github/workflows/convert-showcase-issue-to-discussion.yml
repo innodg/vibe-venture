@@ -164,19 +164,50 @@ jobs:
           fi
           echo "id=$id" >> "$GITHUB_OUTPUT"
 
-      - name: Convert issue to discussion
+      - name: Create discussion from issue content
+        id: create_discussion
         if: steps.validate.outputs.valid == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_ID: ${{ github.event.issue.node_id }}
+          REPOSITORY_ID: ${{ github.event.repository.node_id }}
           CATEGORY_ID: ${{ steps.cat.outputs.id }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
         run: |
-          gh api graphql \
+          body=$(cat <<EOF
+          원본 이슈: $ISSUE_URL
+
+          $ISSUE_BODY
+          EOF
+          )
+
+          discussion_url=$(gh api graphql \
+            -F repositoryId="$REPOSITORY_ID" \
+            -F categoryId="$CATEGORY_ID" \
+            -F title="$ISSUE_TITLE" \
+            -F body="$body" \
             -f query='
-              mutation($issueId: ID!, $categoryId: ID!) {
-                convertIssueToDiscussion(input: {issueId: $issueId, categoryId: $categoryId}) {
+              mutation($repositoryId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
+                createDiscussion(input: {
+                  repositoryId: $repositoryId,
+                  categoryId: $categoryId,
+                  title: $title,
+                  body: $body
+                }) {
                   discussion { url }
                 }
               }' \
-            -f issueId="$ISSUE_ID" \
-            -F categoryId="$CATEGORY_ID"
+            --jq '.data.createDiscussion.discussion.url')
+
+          echo "discussion_url=$discussion_url" >> "$GITHUB_OUTPUT"
+
+      - name: Comment and close original issue
+        if: steps.validate.outputs.valid == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          DISCUSSION_URL: ${{ steps.create_discussion.outputs.discussion_url }}
+        run: |
+          gh issue comment "$ISSUE_URL" --body "토론으로 옮겼습니다: $DISCUSSION_URL"
+          gh issue close "$ISSUE_URL" --reason completed
