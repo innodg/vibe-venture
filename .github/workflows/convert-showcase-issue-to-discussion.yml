@@ -91,10 +91,14 @@ jobs:
               '.trafficmanager.net',
           )
           try:
-              host = (urlparse(url).hostname or '').lower()
+              parsed = urlparse(url)
+              scheme = (parsed.scheme or '').lower()
+              host = (parsed.hostname or '').lower()
           except Exception:
-              host = ''
-          if not host or not host.endswith(azure_suffixes):
+              scheme, host = '', ''
+          if scheme != 'https':
+              errors.append('앱 배포 링크는 반드시 https:// 로 시작해야 합니다.')
+          elif not host or not host.endswith(azure_suffixes):
               errors.append('앱 배포 링크는 반드시 Azure 클라우드에 있어야 합니다.')
 
           school = get('애플리케이션 개발자 학교')
