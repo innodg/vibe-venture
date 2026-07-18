@@ -9,7 +9,12 @@ permissions:
 
 jobs:
   lock:
-    if: github.event.discussion.category.slug == '01-내가-만든-앱-자랑하기'
+    # if: github.event.discussion.category.slug == '01-내가-만든-앱-자랑하기-6월'
+    if: github.event.discussion.category.slug == '01-내가-만든-앱-자랑하기-7월'
+    # if: github.event.discussion.category.slug == '01-내가-만든-앱-자랑하기-8월'
+    # if: github.event.discussion.category.slug == '01-내가-만든-앱-자랑하기-9월'
+    # if: github.event.discussion.category.slug == '01-내가-만든-앱-자랑하기-10월'
+    # if: github.event.discussion.category.slug == '01-내가-만든-앱-자랑하기-11월'
     runs-on: ubuntu-latest
     steps:
       - name: Check author permission
