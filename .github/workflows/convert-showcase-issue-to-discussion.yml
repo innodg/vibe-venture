@@ -146,8 +146,8 @@ jobs:
           OWNER: ${{ github.repository_owner }}
           REPO: ${{ github.event.repository.name }}
           # CATEGORY_SLUG: '01-내가-만든-앱-자랑하기-6월'
-          CATEGORY_SLUG: '01-내가-만든-앱-자랑하기-7월'
-          # CATEGORY_SLUG: '01-내가-만든-앱-자랑하기-8월'
+          # CATEGORY_SLUG: '01-내가-만든-앱-자랑하기-7월'
+          CATEGORY_SLUG: '01-내가-만든-앱-자랑하기-8월'
           # CATEGORY_SLUG: '01-내가-만든-앱-자랑하기-9월'
           # CATEGORY_SLUG: '01-내가-만든-앱-자랑하기-10월'
           # CATEGORY_SLUG: '01-내가-만든-앱-자랑하기-11월'
