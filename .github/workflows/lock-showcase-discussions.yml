@@ -3,25 +3,60 @@ name: Lock showcase discussions
 on:
   discussion:
     types: [created]
+  workflow_dispatch:
+    inputs:
+      discussion_number:
+        description: Discussion number to lock
+        required: true
+        type: number
 
 permissions:
   discussions: write
 
 jobs:
   lock:
-    # if: github.event.discussion.category.slug == '01-내가-만든-앱-자랑하기-6월'
-    # if: github.event.discussion.category.slug == '02-내가-만든-앱-자랑하기-7월'
-    # if: github.event.discussion.category.slug == '03-내가-만든-앱-자랑하기-8월'
-    if: github.event.discussion.category.slug == '04-내가-만든-앱-자랑하기-9월'
-    # if: github.event.discussion.category.slug == '05-내가-만든-앱-자랑하기-10월'
-    # if: github.event.discussion.category.slug == '06-내가-만든-앱-자랑하기-11월'
+    # github.event.discussion.category.slug == '01-내가-만든-앱-자랑하기-6월'
+    # github.event.discussion.category.slug == '02-내가-만든-앱-자랑하기-7월'
+    # github.event.discussion.category.slug == '03-내가-만든-앱-자랑하기-8월'
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      github.event.discussion.category.slug == '04-내가-만든-앱-자랑하기-9월'
+    # github.event.discussion.category.slug == '05-내가-만든-앱-자랑하기-10월'
+    # github.event.discussion.category.slug == '06-내가-만든-앱-자랑하기-11월'
     runs-on: ubuntu-latest
     steps:
+      - name: Load discussion details
+        id: discussion
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISCUSSION_NUMBER: ${{ inputs.discussion_number || github.event.discussion.number }}
+        run: |
+          if ! [[ "$DISCUSSION_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Discussion number must be a positive integer."
+            exit 1
+          fi
+
+          discussion=$(gh api "repos/${GITHUB_REPOSITORY}/discussions/$DISCUSSION_NUMBER")
+          {
+            echo "node_id=$(jq -r '.node_id' <<<"$discussion")"
+            echo "author=$(jq -r '.user.login' <<<"$discussion")"
+            echo "category_slug=$(jq -r '.category.slug' <<<"$discussion")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify showcase category
+        if: steps.discussion.outputs.category_slug != '04-내가-만든-앱-자랑하기-9월'
+        env:
+          DISCUSSION_NUMBER: ${{ inputs.discussion_number || github.event.discussion.number }}
+          CATEGORY_SLUG: ${{ steps.discussion.outputs.category_slug }}
+        run: |
+          echo "::error::Discussion #$DISCUSSION_NUMBER is in category '$CATEGORY_SLUG', not the active showcase category."
+          exit 1
+
       - name: Check author permission
         id: perm
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          AUTHOR: ${{ github.event.discussion.user.login }}
+          AUTHOR: ${{ steps.discussion.outputs.author }}
         run: |
           permission=$(gh api "repos/${{ github.repository }}/collaborators/$AUTHOR/permission" --jq '.permission')
           echo "permission=$permission" >> "$GITHUB_OUTPUT"
@@ -30,7 +65,7 @@ jobs:
         if: steps.perm.outputs.permission != 'admin'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DISCUSSION_ID: ${{ github.event.discussion.node_id }}
+          DISCUSSION_ID: ${{ steps.discussion.outputs.node_id }}
         run: |
           gh api graphql \
             -f query='mutation($id: ID!) { lockLockable(input: {lockableId: $id}) { lockedRecord { locked } } }' \
