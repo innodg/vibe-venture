@@ -3,6 +3,12 @@ name: Convert showcase issue to discussion
 on:
   issues:
     types: [opened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Issue number to convert
+        required: true
+        type: number
 
 permissions:
   issues: write
@@ -10,9 +16,45 @@ permissions:
 
 jobs:
   convert:
-    if: contains(github.event.issue.labels.*.name, 'showcase')
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(github.event.issue.labels.*.name, 'showcase')
     runs-on: ubuntu-latest
     steps:
+      - name: Load issue details
+        id: issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ inputs.issue_number || github.event.issue.number }}
+        run: |
+          if ! [[ "$ISSUE_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Issue number must be a positive integer."
+            exit 1
+          fi
+
+          issue=$(gh api "repos/${GITHUB_REPOSITORY}/issues/$ISSUE_NUMBER")
+          body_delimiter="issue_body_$(openssl rand -hex 16)"
+          {
+            echo "number=$(jq -r '.number' <<<"$issue")"
+            echo "title=$(jq -r '.title // ""' <<<"$issue")"
+            echo "url=$(jq -r '.html_url' <<<"$issue")"
+            echo "author=$(jq -r '.user.login' <<<"$issue")"
+            echo "has_showcase_label=$(jq -r 'any(.labels[]; .name == "showcase")' <<<"$issue")"
+            echo "body<<$body_delimiter"
+            jq -r '.body // ""' <<<"$issue"
+            echo "$body_delimiter"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify showcase issue
+        if: |
+          github.event_name == 'workflow_dispatch' &&
+          steps.issue.outputs.has_showcase_label != 'true'
+        env:
+          ISSUE_NUMBER: ${{ steps.issue.outputs.number }}
+        run: |
+          echo "::error::Issue #$ISSUE_NUMBER does not have the showcase label."
+          exit 1
+
       - name: Generate bot token
         id: bot-token
         uses: actions/create-github-app-token@v3
@@ -27,7 +69,7 @@ jobs:
         id: perm
         env:
           GH_TOKEN: ${{ steps.bot-token.outputs.token }}
-          AUTHOR: ${{ github.event.issue.user.login }}
+          AUTHOR: ${{ steps.issue.outputs.author }}
           ORG: ${{ github.repository_owner }}
         run: |
           allowed=false
@@ -45,7 +87,7 @@ jobs:
         if: steps.perm.outputs.allowed == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_URL: ${{ steps.issue.outputs.url }}
         run: |
           gh issue comment "$ISSUE_URL" --body "바이브 벤처 프로젝트 참가자가 아닙니다."
           gh issue close "$ISSUE_URL" --reason "not planned"
@@ -54,7 +96,7 @@ jobs:
         id: validate
         if: steps.perm.outputs.allowed == 'true'
         env:
-          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_BODY: ${{ steps.issue.outputs.body }}
         run: |
           python3 <<'PY'
           import os, re
@@ -132,7 +174,7 @@ jobs:
         if: steps.validate.outputs.valid == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_URL: ${{ steps.issue.outputs.url }}
           COMMENT: ${{ steps.validate.outputs.comment }}
         run: |
           gh issue comment "$ISSUE_URL" --body "$COMMENT"
@@ -176,9 +218,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPOSITORY_ID: ${{ github.event.repository.node_id }}
           CATEGORY_ID: ${{ steps.cat.outputs.id }}
-          ISSUE_TITLE: ${{ github.event.issue.title }}
-          ISSUE_BODY: ${{ github.event.issue.body }}
-          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_TITLE: ${{ steps.issue.outputs.title }}
+          ISSUE_BODY: ${{ steps.issue.outputs.body }}
+          ISSUE_URL: ${{ steps.issue.outputs.url }}
         run: |
           body=$(cat <<EOF
           원본 이슈: $ISSUE_URL
@@ -214,7 +256,7 @@ jobs:
         if: steps.validate.outputs.valid == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_URL: ${{ steps.issue.outputs.url }}
           DISCUSSION_URL: ${{ steps.create_discussion.outputs.discussion_url }}
         run: |
           gh issue comment "$ISSUE_URL" --body "토론으로 옮겼습니다: $DISCUSSION_URL"
