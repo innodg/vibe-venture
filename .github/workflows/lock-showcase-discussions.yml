@@ -18,10 +18,10 @@ jobs:
     # github.event.discussion.category.slug == '01-내가-만든-앱-자랑하기-6월'
     # github.event.discussion.category.slug == '02-내가-만든-앱-자랑하기-7월'
     # github.event.discussion.category.slug == '03-내가-만든-앱-자랑하기-8월'
+    # github.event.discussion.category.slug == '04-내가-만든-앱-자랑하기-9월'
     if: |
       github.event_name == 'workflow_dispatch' ||
-      github.event.discussion.category.slug == '04-내가-만든-앱-자랑하기-9월'
-    # github.event.discussion.category.slug == '05-내가-만든-앱-자랑하기-10월'
+      github.event.discussion.category.slug == '05-내가-만든-앱-자랑하기-10월'
     # github.event.discussion.category.slug == '06-내가-만든-앱-자랑하기-11월'
     runs-on: ubuntu-latest
     steps:
@@ -44,7 +44,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Verify showcase category
-        if: steps.discussion.outputs.category_slug != '04-내가-만든-앱-자랑하기-9월'
+        if: steps.discussion.outputs.category_slug != '05-내가-만든-앱-자랑하기-10월'
         env:
           DISCUSSION_NUMBER: ${{ inputs.discussion_number || github.event.discussion.number }}
           CATEGORY_SLUG: ${{ steps.discussion.outputs.category_slug }}
