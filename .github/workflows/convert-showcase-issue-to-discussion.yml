@@ -191,8 +191,9 @@ jobs:
           # CATEGORY_SLUG: '02-내가-만든-앱-자랑하기-7월'
           # CATEGORY_SLUG: '03-내가-만든-앱-자랑하기-8월'
           # CATEGORY_SLUG: '04-내가-만든-앱-자랑하기-9월'
-          CATEGORY_SLUG: '05-내가-만든-앱-자랑하기-10월'
+          # CATEGORY_SLUG: '05-내가-만든-앱-자랑하기-10월'
           # CATEGORY_SLUG: '06-내가-만든-앱-자랑하기-11월'
+          CATEGORY_SLUG: '07-최종-발표회'
         run: |
           id=$(gh api graphql \
             -F owner="$OWNER" \
